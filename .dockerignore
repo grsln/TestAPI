@@ -1,0 +1,8 @@
+.git
+venv
+.idea
+.env.dev
+.env.docker.dev
+.env.prod
+.env.prod.db
+start.sh

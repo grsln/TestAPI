@@ -1,0 +1,73 @@
+###########
+# BUILDER #
+###########
+
+# pull official base image
+FROM python:3.7.8-alpine3.12 as builder
+
+# set work directory
+WORKDIR /usr/src/test_project
+
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# install psycopg2 dependencies
+RUN apk update \
+    && apk add postgresql-dev gcc python3-dev musl-dev
+# install pillow dependencies
+RUN apk add jpeg-dev zlib-dev libjpeg
+# lint
+RUN pip install --upgrade pip
+RUN pip install flake8
+COPY . .
+RUN flake8 --ignore=E501,F401 .
+
+# install dependencies
+COPY ./requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/test_project/wheels -r requirements.txt
+
+
+#########
+# FINAL #
+#########
+
+# pull official base image
+FROM python:3.7.8-alpine3.12
+
+# create directory for the app user
+RUN mkdir -p /home/test_project
+
+# create the app user
+RUN addgroup -S test_project && adduser -S test_project -G test_project
+
+# create the appropriate directories
+ENV HOME=/home/test_project
+ENV APP_HOME=/home/test_project/web
+RUN mkdir $APP_HOME
+RUN mkdir $APP_HOME/static
+# RUN mkdir $APP_HOME/media
+WORKDIR $APP_HOME
+
+# install dependencies
+RUN apk update && apk add libpq
+# install pillow dependencies
+RUN apk add jpeg-dev zlib-dev libjpeg
+COPY --from=builder /usr/src/test_project/wheels /wheels
+COPY --from=builder /usr/src/test_project/requirements.txt .
+RUN pip install --no-cache /wheels/*
+
+# copy entrypoint-prod.sh
+COPY ./entrypoint.prod.sh $APP_HOME
+
+# copy project
+COPY . $APP_HOME
+
+# chown all the files to the app user
+RUN chown -R test_project:test_project $APP_HOME
+
+# change to the app user
+USER test_project
+
+# run entrypoint.prod.sh
+ENTRYPOINT ["/home/test_project/web/entrypoint.prod.sh"]
