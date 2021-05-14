@@ -6,3 +6,7 @@ venv
 .env.prod
 .env.prod.db
 start.sh
+.env.prod.proxy-companion
+.env.staging
+.env.staging.db
+.env.staging.proxy-companion
